@@ -1,0 +1,10 @@
+[project]
+name = "rag-system"
+version = "0.1.0"
+description = "RAG SYSTEM"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.43.108",
+    "botocore[crt]>=1.43.108",
+]
