@@ -1,15 +1,24 @@
 terraform {
+  required_version = ">= 1.11.0"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
   }
+
+  backend "s3" {
+    bucket       = "rag-system-tfstate-702872201875"
+    key          = "infra/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
-  region  = "us-east-1"
-  profile = "rag"
+  region = "us-east-1"
 
   default_tags {
     tags = {
