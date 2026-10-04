@@ -1,6 +1,7 @@
 import pytest
 
-from rag.chunking import chunk_text
+from rag.chunking import chunk_text, clean_text
+
 
 
 def test_alphabet_example():
@@ -68,3 +69,17 @@ def test_no_redundant_tail_chunk():
         "ABCDEFGHIJ",
         "HIJKLMNOPQ",
     ]
+
+def test_clean_text_replaces_nbsp_and_collapses_spaces():
+    text = "Yes\xa0\xa0☒\xa0\xa0No"
+
+    result = clean_text(text)
+
+    assert result == "Yes ☒ No"
+
+def test_clean_text_strips_outer_whitespace():
+    text = "   Hello   world   "
+
+    result = clean_text(text)
+
+    assert result == "Hello world"

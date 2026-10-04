@@ -1,3 +1,10 @@
+import re
+
+def clean_text(text: str) -> str:
+    text = text.replace("\xa0", " ")
+    text = re.sub(r"[ \t]+", " ", text)
+    return text.strip()
+
 def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
     """Split text into overlapping character-based chunks."""
 
@@ -10,7 +17,7 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
     if overlap >= chunk_size:
         raise ValueError("overlap must be less than chunk_size")
 
-    if not text:
+    if not text.strip():
         return []
 
     if len(text) <= chunk_size:
