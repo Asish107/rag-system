@@ -4,10 +4,10 @@ resource "aws_db_instance" "rag" {
   engine         = "postgres"
   engine_version = "17"
 
-  instance_class        = "db.t3.micro"
-  allocated_storage     = 20
-  storage_type          = "gp2"
-  storage_encrypted     = true
+  instance_class          = "db.t3.micro"
+  allocated_storage       = 20
+  storage_type            = "gp2"
+  storage_encrypted       = true
   backup_retention_period = 1
 
   publicly_accessible = true
