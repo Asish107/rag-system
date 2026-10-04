@@ -18,8 +18,9 @@ resource "aws_db_instance" "rag" {
   username = "rag"
 
   manage_master_user_password = true
-
+  iam_database_authentication_enabled = true
   vpc_security_group_ids = [
     aws_security_group.rag_db_sg.id
   ]
 }
+
