@@ -16,3 +16,5 @@ documents/
 *.tfstate
 *.tfstate.*
 terraform.tfvars
+lambda/search/
+lambda/*.zip
