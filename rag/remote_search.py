@@ -6,8 +6,6 @@ import boto3
 from rag.retrieval import SearchResult
 
 
-SEARCH_FUNCTION_NAME = os.environ["SEARCH_FUNCTION_NAME"]
-
 lambda_client = boto3.client(
     "lambda",
     region_name="us-east-1",
@@ -18,8 +16,10 @@ def search_via_lambda(
     embedding: list[float],
     limit: int,
 ) -> list[SearchResult]:
+    search_function_name = os.environ["SEARCH_FUNCTION_NAME"]
+
     response = lambda_client.invoke(
-        FunctionName=SEARCH_FUNCTION_NAME,
+        FunctionName=search_function_name,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {

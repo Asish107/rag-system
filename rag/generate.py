@@ -1,11 +1,13 @@
 import json
 import os
+from functools import cache
 
 import boto3
 from openai import OpenAI
 
 
 SECRET_NAME = "rag/openrouter-api-key"
+
 
 secretsmanager = boto3.client(
     "secretsmanager",
@@ -20,28 +22,31 @@ def get_openrouter_api_key() -> str:
 
     secret_string = response["SecretString"]
 
-    # Supports either a raw API key or {"api_key": "..."}.
     try:
         secret = json.loads(secret_string)
+
         if isinstance(secret, dict) and "api_key" in secret:
             return secret["api_key"]
+
     except json.JSONDecodeError:
         pass
 
     return secret_string
 
 
-OPENROUTER_API_KEY = get_openrouter_api_key()
+@cache
+def get_client() -> OpenAI:
+    api_key = get_openrouter_api_key()
 
-CLAUDE_MODEL_ID = os.environ["CLAUDE_MODEL_ID"]
-
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_API_KEY,
-)
+    return OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
 
 
 def generate_answer(question: str, context: str) -> str:
+    claude_model_id = os.environ["CLAUDE_MODEL_ID"]
+
     prompt = f"""
 You are answering questions using only the supplied document context.
 
@@ -61,8 +66,8 @@ Document context:
 {context}
 """
 
-    response = client.chat.completions.create(
-        model=CLAUDE_MODEL_ID,
+    response = get_client().chat.completions.create(
+        model=claude_model_id,
         messages=[
             {
                 "role": "user",
