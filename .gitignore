@@ -19,5 +19,4 @@ terraform.tfvars
 lambda/search/
 lambda/*.zip
 lambda/search/
-lambda/*.zip
 lambda/api/
