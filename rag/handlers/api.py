@@ -5,7 +5,6 @@ import traceback
 from rag.rag import answer_question
 from rag.remote_search import search_via_lambda
 
-
 MAX_QUESTION_LENGTH = 1000
 
 

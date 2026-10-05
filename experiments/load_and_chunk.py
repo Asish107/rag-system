@@ -1,5 +1,4 @@
-from rag.loader import list_documents, load_document, chunk_document
-
+from rag.loader import chunk_document, list_documents, load_document
 
 bucket = "rag-system-docs-10ks"
 prefix = "raw/"

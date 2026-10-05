@@ -2,7 +2,6 @@ import os
 
 from rag.embeddings import embed
 from rag.generate import generate_answer
-from rag.retrieval import SearchResult
 
 MAX_DISTANCE = float(
     os.getenv("RETRIEVAL_MAX_DISTANCE", "0.70")

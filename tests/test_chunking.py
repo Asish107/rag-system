@@ -3,7 +3,6 @@ import pytest
 from rag.chunking import chunk_text, clean_text
 
 
-
 def test_alphabet_example():
     text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 

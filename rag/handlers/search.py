@@ -6,8 +6,6 @@ from pgvector.psycopg import register_vector
 
 from rag.retrieval import search_chunks
 
-
-DB_HOST = os.environ["DB_HOST"]
 DB_PORT = 5432
 DB_NAME = "rag"
 DB_USER = "rag_reader"
@@ -35,14 +33,16 @@ def get_connection():
 
             connection = None
 
+    db_host = os.environ["DB_HOST"]
+
     token = rds.generate_db_auth_token(
-        DBHostname=DB_HOST,
+        DBHostname=db_host,
         Port=DB_PORT,
         DBUsername=DB_USER,
     )
 
     connection = psycopg.connect(
-        host=DB_HOST,
+        host=db_host,
         port=DB_PORT,
         dbname=DB_NAME,
         user=DB_USER,

@@ -1,4 +1,6 @@
 from rag.loader import Page, chunk_document
+
+
 def test_chunk_document_preserves_metadata_and_skips_empty_pages():
     pages = [
         Page(

@@ -2,7 +2,6 @@ from rag.db import get_connection, upsert_chunks
 from rag.embeddings import embed
 from rag.loader import chunk_document, list_documents, load_document
 
-
 BUCKET = "rag-system-docs-10ks"
 PREFIX = "raw/"
 

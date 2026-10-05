@@ -5,7 +5,6 @@ from functools import cache
 import boto3
 from openai import OpenAI
 
-
 SECRET_NAME = "rag/openrouter-api-key"
 
 

@@ -8,6 +8,7 @@ from pgvector.psycopg import register_vector
 from rag.loader import Chunk
 from rag.retrieval import SearchResult, search_chunks
 
+
 def get_connection():
     """Create a PostgreSQL connection using a password from Secrets Manager."""
     endpoint = os.environ["DB_ENDPOINT"]

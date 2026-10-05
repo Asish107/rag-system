@@ -5,7 +5,6 @@ import boto3
 
 from rag.retrieval import SearchResult
 
-
 lambda_client = boto3.client(
     "lambda",
     region_name="us-east-1",
