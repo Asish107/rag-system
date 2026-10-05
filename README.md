@@ -279,9 +279,12 @@ In particular:
 * `infra/versions.tf` contains the Terraform backend bucket name.
 * `infra/storage.tf` contains the document bucket name.
 
-`infra/storage.tf` currently **imports** the existing document bucket because it was created before Terraform management was added.
+Two files contain `import` blocks because these resources were created by hand before Terraform managed them:
 
-For a brand-new environment, you should change the storage configuration so Terraform **creates** your newly named document bucket rather than importing the original project bucket.
+* `infra/storage.tf` imports the original document bucket.
+* `infra/secrets.tf` imports the original OpenRouter secret by its ARN, which contains the original AWS account ID.
+
+In a new AWS account those resources do not exist, so the imports would fail. **Delete both `import` blocks** (keep the `resource` blocks) so Terraform **creates** your bucket and secret instead.
 
 ### Step 1 — Bootstrap Terraform state
 
@@ -304,36 +307,53 @@ Run the deployment script:
 
 This is the correct first infrastructure deployment on a fresh clone because it:
 
-1. runs the tests
-2. runs Ruff
-3. builds both Lambda packages
-4. creates the Lambda ZIPs
-5. runs Terraform apply
+1. runs Ruff
+2. runs the tests
+3. builds both Lambda packages (`lambda/search/` and `lambda/api/` are gitignored, so they do not exist in a fresh clone; running `terraform apply` directly would fail)
+4. runs Terraform apply
 
-Terraform then creates the AWS infrastructure, including the RDS instance.
+Terraform then creates the AWS infrastructure, including the RDS instance, the document bucket, and an empty OpenRouter secret.
 
 The Search Lambda can be deployed before any document data exists. It will simply return no useful retrieval results until ingestion has populated the database.
+
+Next, store your OpenRouter API key in the secret Terraform created. `read -s` keeps the key out of your terminal and shell history:
+
+```bash
+read -s OR_KEY
+aws secretsmanager put-secret-value \
+  --secret-id rag/openrouter-api-key \
+  --secret-string "$OR_KEY" && unset OR_KEY
+```
+
+Use a regular OpenRouter **API key** (not a management key) and give it a spending limit.
 
 ### Step 3 — Create the database schema
 
 After RDS is available, connect as the administrative database user.
 
-Set your database connection variables:
+RDS generated the admin password and stores it in Secrets Manager (`manage_master_user_password = true`). Read it from there; nobody types it:
+
+```bash
+export PGPASSWORD="$(
+  aws secretsmanager get-secret-value \
+    --secret-id "$(terraform -chdir=infra output -raw db_secret_arn)" \
+    --query SecretString \
+    --output text |
+  jq -r '.password'
+)"
+```
+
+Set the connection variables (psql reads these automatically):
 
 ```bash
 export PGHOST="$(terraform -chdir=infra output -raw db_endpoint)"
 export PGPORT="$(terraform -chdir=infra output -raw db_port)"
 export PGDATABASE="rag"
 export PGUSER="rag"
+export PGSSLMODE="require"
 ```
 
-Export the database password when required by your connection method:
-
-```bash
-export PGPASSWORD="YOUR_RDS_PASSWORD"
-```
-
-Then run the schema and permissions scripts:
+Then run the schema and permissions scripts, in order:
 
 ```bash
 psql \
@@ -350,16 +370,19 @@ The scripts create:
 
 ### Step 4 — Configure ingestion
 
-Set the AWS region and S3 bucket used by the ingestion pipeline.
-
-For example:
+Upload the 10-K PDFs under the `raw/` prefix of your document bucket:
 
 ```bash
-export AWS_REGION="us-east-1"
-export DOCUMENT_BUCKET="YOUR_DOCUMENT_BUCKET"
+aws s3 sync documents/ s3://YOUR_DOCUMENT_BUCKET/raw/
 ```
 
-Upload the 10-K PDFs to the appropriate S3 location.
+Set the variables the ingestion code reads (`rag/ingest.py` reads `DOCUMENT_BUCKET`; `rag/db.py` reads `DB_ENDPOINT` and `DB_SECRET_ARN`):
+
+```bash
+export DOCUMENT_BUCKET="YOUR_DOCUMENT_BUCKET"
+export DB_ENDPOINT="$(terraform -chdir=infra output -raw db_endpoint)"
+export DB_SECRET_ARN="$(terraform -chdir=infra output -raw db_secret_arn)"
+```
 
 Then run ingestion:
 
@@ -373,21 +396,19 @@ The ingestion process is designed to be idempotent so rerunning it does not requ
 
 ### Step 5 — Configure API deployment variables
 
-Set the model configuration when needed:
+The deployed model is a **Terraform variable**, not a shell variable. Exporting `CLAUDE_MODEL_ID` on your laptop does not change the Lambda. To change models, set it in `infra/terraform.tfvars` (gitignored):
+
+```hcl
+claude_model_id = "anthropic/claude-sonnet-5.5"
+```
+
+Then redeploy:
 
 ```bash
-export CLAUDE_MODEL_ID="anthropic/claude-sonnet-5.5"
+./scripts/deploy.sh
 ```
 
-The Terraform configuration also supplies the Search Lambda name and retrieval cutoff to the API Lambda.
-
-The OpenRouter API key must exist in Secrets Manager under:
-
-```text
-rag/openrouter-api-key
-```
-
-The secret value should contain the OpenRouter API key.
+Terraform also passes the Search Lambda name and the retrieval cutoff (`RETRIEVAL_MAX_DISTANCE`) to the API Lambda as environment variables.
 
 ### Step 6 — Subsequent deployments
 
@@ -544,6 +565,50 @@ rag-system/
 ```
 
 `experiments/` contains manual experiments. Evaluation questions are kept separately under `evals/`.
+
+## Measured results
+
+Collected from the running system, not estimated from documentation. Each was measured on this two-document corpus, usually from a single run, so treat them as observations, not benchmarks.
+
+| Measurement | Result |
+| --- | ---: |
+| Stored chunks (Apple 277 + NVIDIA 325) | 602 |
+| Best distance, relevant question (NVIDIA R&D) | ~0.46 |
+| Best distance, off-topic question ("What's your name?") | ~0.90 |
+| Sequential scan (planner's choice) | ~5.4 ms |
+| HNSW index scan (forced with `enable_seqscan = off`) | ~0.48 ms |
+| Search Lambda cold start (init) | ~830 ms |
+| Ingestion, sequential Titan calls | ~5 minutes per 10-K |
+| 80-request parallel burst: rejected by API Gateway throttling | 3 × HTTP 429 |
+| 80-request parallel burst: rejected by the Lambda concurrency limit | 20 × HTTP 503 |
+
+The distances are reproducible: after destroying the database, recreating it from Terraform, and re-ingesting, the same question returned the same page at the same distance (0.4585).
+
+## Known limitations
+
+### Retrieval misses specific topics (semantic dilution)
+
+The Apple/China question retrieved no China-specific chunks in the top five. The system correctly answered "I don't know" rather than guessing, but the right passages exist in the corpus and were not found. Candidate fixes (hybrid keyword + vector search, smaller chunks, reranking, query rewriting) should be chosen by evaluation, not intuition.
+
+### The retrieval cutoff is provisional
+
+`0.70` sits between a handful of observed relevant (~0.46) and off-topic (~0.90) distances. It has not been calibrated against a labelled question set.
+
+### RDS is still publicly accessible from the administrator's IP
+
+The database has `publicly_accessible = true` and a security-group rule for one administrator IP, so schema migrations and ingestion can run from a laptop. The Lambda path does not need this. Making the database fully private requires moving ingestion and admin access into AWS (see Roadmap).
+
+### Lambda concurrency is limited to 10
+
+This account allows 10 concurrent Lambda executions. Each API request uses two (the API Lambda invokes the search Lambda), so roughly five simultaneous requests can run before requests fail with HTTP 503. A production workload would need a quota increase sized against real traffic.
+
+### API Gateway throttling is approximate
+
+With a configured rate of 1 request/second and a burst of 5, an 80-request burst produced only 3 throttled responses. API Gateway enforces throttling on a best-effort, distributed basis. The hard cost ceiling is the OpenRouter key's spending limit, not the throttle.
+
+### No automated RAG evaluation yet
+
+Tests cover the code paths (cutoff, validation, error handling), not answer quality. Retrieval recall, answer correctness, and citation correctness are measured only by hand so far.
 
 ## Roadmap
 

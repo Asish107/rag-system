@@ -1,20 +1,23 @@
+import os
+
 from rag.db import get_connection, upsert_chunks
 from rag.embeddings import embed
 from rag.loader import chunk_document, list_documents, load_document
 
-BUCKET = "rag-system-docs-10ks"
 PREFIX = "raw/"
 
 
 def main():
-    keys = list_documents(BUCKET, PREFIX)
+    bucket = os.environ["DOCUMENT_BUCKET"]
+
+    keys = list_documents(bucket, PREFIX)
 
     print(f"Found {len(keys)} documents")
 
     for document_number, key in enumerate(keys, start=1):
         print(f"\n[{document_number}/{len(keys)}] {key}")
 
-        pages = load_document(BUCKET, key)
+        pages = load_document(bucket, key)
         print(f"      {len(pages)} pages")
 
         chunks = chunk_document(pages)
