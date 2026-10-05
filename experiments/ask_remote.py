@@ -1,5 +1,5 @@
-from rag.db import search_database
 from rag.rag import answer_question
+from rag.remote_search import search_via_lambda
 
 
 def main():
@@ -7,7 +7,7 @@ def main():
 
     answer = answer_question(
         question,
-        search_database,
+        search_via_lambda,
     )
 
     print("\n" + "=" * 80)

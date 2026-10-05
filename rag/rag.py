@@ -1,10 +1,8 @@
 import os
 
-from rag.db import get_connection
 from rag.embeddings import embed
 from rag.generate import generate_answer
-from rag.retrieval import search_chunks
-
+from rag.retrieval import SearchResult
 
 MAX_DISTANCE = float(
     os.getenv("RETRIEVAL_MAX_DISTANCE", "0.70")
@@ -13,26 +11,19 @@ MAX_DISTANCE = float(
 
 def answer_question(
     question: str,
+    search_fn,
     limit: int = 5,
 ) -> str:
     query_embedding = embed(question)
 
-    with get_connection() as connection:
-        results = search_chunks(
-            connection,
-            query_embedding,
-            limit=limit,
-        )
+    results = search_fn(query_embedding, limit)
 
     if not results:
         return "I don't know based on the provided documents."
 
-    # The results are ordered by distance, so the first result
-    # is the most similar chunk.
     if results[0].distance > MAX_DISTANCE:
         return "I don't know based on the provided documents."
 
-    # Only pass chunks that meet the relevance threshold to Claude.
     relevant_results = [
         result
         for result in results
