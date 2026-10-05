@@ -19,8 +19,9 @@ resource "aws_apigatewayv2_integration" "rag_api" {
 resource "aws_apigatewayv2_route" "ask" {
   api_id = aws_apigatewayv2_api.rag.id
 
-  route_key = "POST /ask"
-  target    = "integrations/${aws_apigatewayv2_integration.rag_api.id}"
+  route_key          = "POST /ask"
+  authorization_type = "AWS_IAM"
+  target             = "integrations/${aws_apigatewayv2_integration.rag_api.id}"
 }
 
 resource "aws_apigatewayv2_stage" "default" {
