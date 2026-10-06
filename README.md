@@ -501,13 +501,15 @@ The RDS estimate includes the public IPv4 address currently attached to the data
 
 The OpenRouter API key also has a **$2 hard spending limit** configured as an additional safeguard.
 
-For temporary development environments, AWS resources can be paused or removed with targeted Terraform destruction using:
+To pause the main cost while keeping the documents, secret and Terraform state:
 
 ```bash
-terraform -chdir=infra destroy -target=RESOURCE
+terraform -chdir=infra destroy -target=aws_db_instance.rag
 ```
 
-Use targeted destruction carefully because Terraform may leave dependent resources behind. For a permanent teardown, review the full Terraform plan before destroying the environment.
+`-target` destroys the target **and everything that depends on it**. Because both Lambdas, their IAM policies and the API Gateway integration, route and permission all reference the database (directly or through each other), this one command also removes them. The document bucket and the OpenRouter secret survive because they have `prevent_destroy`. After a pause, `/ask` has no route until you rebuild.
+
+To bring everything back, run `./scripts/deploy.sh`, then the three SQL files (Step 3), then ingestion (Step 4). It takes about 15 minutes, most of it RDS creation and embedding.
 
 ## Repository layout
 
