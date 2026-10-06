@@ -16,6 +16,7 @@ import pytest
         "rag.remote_search",
         "rag.handlers.api",
         "rag.handlers.search",
+        "rag.ingest",
     ],
 )
 def test_rag_module_imports(module_name):
